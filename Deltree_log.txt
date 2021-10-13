@@ -1,0 +1,4 @@
+执行任务时间是：2021-01-22 16:40:28
+删除文件所在目录为：/netcaredata/weak_optical/data/weak_optical/bulk_backup/20210121
+删除的文件有:grop_uni_port grop_uni_port_447 grop_uni_port_4856 grop_uni_port_saew
+删除的文件有:olt_eth_port olt_eth_port_x.txt
