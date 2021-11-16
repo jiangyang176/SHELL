@@ -1,0 +1,73 @@
+#!/usr/bin/expect -f
+
+set remote_host [lindex $argv 0]
+set user_name [lindex $argv 1]
+set passwd [lindex $argv 2]
+set source_file [lindex $argv 3]
+set remote_file [lindex $argv 4]
+set timeout [lindex $argv 5]
+set scp_type [lindex $argv 6]
+if {[llength $argv] != 7} {
+    send_user "Usage: expect -f expect_scp_remote \[remote host ip\] \[user name\] \[host password\] \[source file\] \[remote file\] \[timeout value\] \[0:from local to remote 1:from remote to local\]\n"
+    exit 1
+}
+
+#leach keyword
+set key_password "assword:\ "
+set key_init "\(yes/no\)\?\ "
+set key_ps "*:* # "
+
+set do_cmd pwd
+
+if {"$user_name" != "root" && "$user_name" != "oracle" && "$user_name" != "grid"} {
+    set key_ps "*:*> "
+}
+
+if {$scp_type} {
+    set l_from "${user_name}@${remote_host}:${source_file}"
+    set l_to ${remote_file}
+} else {
+    set l_to "${user_name}@${remote_host}:${remote_file}"
+    set l_from ${source_file}
+}
+
+spawn scp -o UserKnownHostsFile=/dev/null -r ${l_from} ${l_to}
+set timeout ${timeout}
+expect {
+        "${key_init}" {
+          send "yes\n"
+          exp_continue
+       } "${key_password}" {
+          exec sleep 0.1
+          send "${passwd}\n"
+          exec sleep 0.1
+          exp_continue
+       } "incorrect" {
+            send_user "invalid password or account\n"
+            exit 1
+       } "denied" {
+           send_user "\n"
+           exit 2
+       }  "not known" {
+           send_user "\n"
+           exit 3
+       } "No such file or directory" {
+          send_user "\n"
+          exit 4
+       } timeout {
+         send_user "Timeout while connect to $remote_host server.\n"
+         exit 4;
+       } "${key_ps}" {
+          send "echo RSTATUS:$?\n"
+          expect -re "RSTATUS:(\[0-9\]+)" {
+          send_user "\n====DO_CMD_END====\n";
+          exit $expect_out(1,string)
+       } eof {
+         send_user "connection to host failed: $expect_out(buffer)\n"
+         send_user "====OVER====\n"
+         exit 5;
+       }
+    }
+    exit
+}
+
