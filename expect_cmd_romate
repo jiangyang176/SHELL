@@ -1,0 +1,85 @@
+#!/usr/bin/expect -f
+
+set host_ip [lindex $argv 0]
+set user_name [lindex $argv 1]
+set passwd [lindex $argv 2]
+set commd [lindex $argv 3]
+set timeout_val [lindex $argv 4]
+
+if {[llength $argv] != 5} {
+    send_user "Usage: expect -f expect_cmd_remote \[host ip\] \[user name\] \[host password\] \[command\] \[timeout value\]\n"
+    exit 1
+}
+
+#leach keyword
+set key_password "assword:\ "
+set key_init "\(yes/no\)\?\ "
+set key_ps "*:* # "
+
+set do_cmd pwd
+
+if {"$user_name" != "root" && "$user_name" != "oracle" && "$user_name" != "grid"} {
+    set key_ps "*:*> "
+}
+
+spawn ssh $user_name@$host_ip
+set timeout ${timeout_val}
+expect {
+        "${key_init}" {
+          send "yes\n"
+          exp_continue
+       } "${key_password}" {
+          exec sleep 0.1
+          send "${passwd}\n"
+          exec sleep 0.1
+          exp_continue
+       } "incorrect" {
+            send_user "invalid password or account.\n"
+            exit 1
+       } "denied" {
+           send_user "\n"
+           exit 2
+       }  "not known" {
+           send_user "\n"
+           exit 3
+       } timeout {
+         send_user "Timeout while connect to $host_ip server.\n"
+         exit 4;
+       } "${key_ps}" {
+          send_user "\n====DO_CMD_BEGIN====\n"
+          send "${commd}\n"
+          set timeout ${timeout_val}
+          
+          expect {
+              "Enter " {
+                send "\n";
+                exp_continue
+             } "yes/no)" {
+                send "yes\n";
+                exp_continue
+             } "y/n)" {
+                send "y\n";
+                exp_continue
+             }  timeout {
+                send_user "Timeout while do the command '${commd}'.\n"
+                exit 11;
+             } "${key_ps}" {
+                send "echo RSTATUS:$?\n"
+                expect -re "RSTATUS:(\[0-9\]+)" {
+                    send_user "\n====DO_CMD_END====\n";
+                    exit $expect_out(1,string)
+                }
+             } eof {
+                send_user "$expect_out(buffer)\n"
+                exit 12;
+             }
+          }
+       } eof {
+         send_user "connection to host failed: $expect_out(buffer)\n"
+         send_user "====OVER====\n"
+         exit 5;
+       }
+    }
+    exit
+}
+
